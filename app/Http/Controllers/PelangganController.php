@@ -20,6 +20,11 @@ class PelangganController extends Controller
 
     // Method to update profile
    // Method to update profile
+public function adminIndex()
+{
+    $pelanggans = Pelanggan::all();
+    return view('admin.users.index', compact('pelanggans'));
+}
 public function updateProfile(Request $request)
 {
     $pelanggan = Auth::guard('pelanggan')->user();
@@ -124,6 +129,18 @@ public function updateProfile(Request $request)
             return redirect()->route('dashboard')->with('success', 'Registrasi berhasil!');
         } catch (\Exception $e) {
             return back()->withErrors(['general' => 'Registrasi gagal: '.$e->getMessage()]);
+        }
+    }
+    public function destroy($id)
+    {
+        try {
+            $pelanggan = Pelanggan::findOrFail($id);
+            $pelanggan->delete();
+            
+            return redirect()->route('admin.user-management.index')
+                ->with('success', 'User deleted successfully');
+        } catch (\Exception $e) {
+            return back()->withErrors(['error' => 'Failed to delete user: ' . $e->getMessage()]);
         }
     }
 }

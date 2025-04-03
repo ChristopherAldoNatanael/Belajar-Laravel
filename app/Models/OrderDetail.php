@@ -8,7 +8,7 @@ class OrderDetail extends Model
 {
     protected $fillable = [
         'idorder',
-        'idpelanggan', // Pastikan ini ada
+        'idpelanggan',
         'idmenu',
         'pelanggan',
         'telp',
@@ -17,6 +17,11 @@ class OrderDetail extends Model
         'total',
         'status',
         'id_transaksi',
+    ];
+
+    // Add status validation rules
+    public static $statusRules = [
+        'status' => 'required|in:Pending,In Transit,Out for Delivery,Delivered,Cancelled'
     ];
 
     public function menu()

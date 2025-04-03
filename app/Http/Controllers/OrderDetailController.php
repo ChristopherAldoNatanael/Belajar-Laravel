@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-
 use App\Models\Cart;
 use App\Models\OrderDetail;
 use Illuminate\Http\Request;
@@ -12,21 +11,23 @@ use Illuminate\Support\Facades\Log as log;
 
 class OrderDetailController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $user = Auth::guard('pelanggan')->user();
-        if (!$user) {
-            return redirect()->route('login')->with('error', 'Anda harus login terlebih dahulu.');
-        }
-
-        // Ambil riwayat pesanan kecuali yang dibatalkan
-        $orders = OrderDetail::where('idpelanggan', $user->idpelanggan)
-            ->where('status', '!=', 'Cancelled') // Tambahkan kondisi ini
+        $status = $request->query('status');
+        
+        $query = OrderDetail::with('menu')
             ->orderBy('created_at', 'desc')
-            ->get()
-            ->groupBy('idorder');
-
-        return view('order.history', compact('orders'));
+            ->take(10);
+            
+        if ($status) {
+            $query->where('status', $status);
+        } else {
+            $query->where('status', '!=', 'Cancelled');
+        }
+        
+        $recentOrders = $query->get()->groupBy('idorder');
+        
+        return view('admin.dashboard', compact('recentOrders'));
     }
 
     public function store(Request $request)
@@ -139,6 +140,32 @@ class OrderDetailController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->route('order.history')->with('error', 'Gagal membatalkan pesanan: ' . $e->getMessage());
+        }
+    }
+    
+    public function updateStatus(Request $request)
+    {
+        // Validate the request data
+        $request->validate([
+            'order_id' => 'required|string', // Changed to string since idorder is varchar
+            'status' => 'required|in:Pending,In Transit,Out for Delivery,Delivered,Cancelled',
+        ]);
+    
+        try {
+            // Find all order details with the given idorder and update their status
+            $updated = OrderDetail::where('idorder', $request->order_id)
+                ->update(['status' => $request->status]);
+            
+            if ($updated) {
+                return response()->json(['success' => true, 'message' => 'Order status updated successfully']);
+            } else {
+                return response()->json(['success' => false, 'message' => 'No orders found with the given ID']);
+            }
+        } catch (\Exception $e) {
+            // Log the error for debugging purposes
+            Log::error('Failed to update order status', ['error' => $e->getMessage()]);
+    
+            return response()->json(['success' => false, 'message' => 'Failed to update order status: ' . $e->getMessage()]);
         }
     }
 }

@@ -8,17 +8,23 @@ use App\Models\Menu;
 use App\Models\Kategori;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use App\Http\Requests\StoreMenuRequest;
 use App\Http\Requests\UpdateMenuRequest;
 
 class MenuController extends Controller
 {
-
     public function index()
     {
-        // Load relasi kategori saat mengambil data menu
         $menus = Menu::with('kategori')->get();
         return view('menu', compact('menus'));
+    }
+
+    public function adminIndex()
+    {
+        $menus = Menu::with('kategori')->get();
+        $kategoris = Kategori::all();
+        return view('admin.menus.index', compact('menus', 'kategoris'));
     }
 
     public function addToCart(Request $request)
@@ -96,15 +102,34 @@ class MenuController extends Controller
      */
     public function create()
     {
-        //
+        $kategoris = Kategori::all();
+        return view('admin.menus.create', compact('kategoris'));
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreMenuRequest $request)
+    public function store(Request $request)
     {
-        //
+        $validated = $request->validate([
+            'menu' => 'required|string|max:255',
+            'idkategori' => 'required|exists:kategoris,idkategori',
+            'harga' => 'required|numeric|min:0',
+            'deskripsi' => 'nullable|string',
+            'gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+        
+        // Handle image upload if present
+        if ($request->hasFile('gambar')) {
+            $imageName = time().'.'.$request->gambar->extension();  
+            $request->gambar->move(public_path('gambar'), $imageName);
+            $validated['gambar'] = $imageName;
+        }
+        
+        Menu::create($validated);
+        
+        return redirect()->route('admin.menu-management.index')
+            ->with('success', 'Menu created successfully');
     }
 
     /**
@@ -112,30 +137,69 @@ class MenuController extends Controller
      */
     public function show(Menu $menu)
     {
-        //
+        return view('admin.menus.show', compact('menu'));
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Menu $menu)
+    public function edit($id)
     {
-        //
+        $menu = Menu::findOrFail($id);
+        return response()->json([
+            'menu' => $menu,
+            'selected_kategori' => $menu->idkategori
+        ]);
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateMenuRequest $request, Menu $menu)
+    public function update(Request $request, $id)
     {
-        //
+        $menu = Menu::findOrFail($id);
+        
+        $validated = $request->validate([
+            'menu' => 'required|string|max:255',
+            'idkategori' => 'required|exists:kategoris,idkategori',
+            'harga' => 'required|numeric|min:0',
+            'deskripsi' => 'nullable|string',
+            'gambar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+        
+        // Handle image upload if present
+        if ($request->hasFile('gambar')) {
+            // Delete old image if exists
+            if ($menu->gambar && file_exists(public_path('gambar/' . $menu->gambar))) {
+                unlink(public_path('gambar/' . $menu->gambar));
+            }
+            
+            $imageName = time().'.'.$request->gambar->extension();  
+            $request->gambar->move(public_path('gambar'), $imageName);
+            $validated['gambar'] = $imageName;
+        }
+        
+        $menu->update($validated);
+        
+        return redirect()->route('admin.menu-management.index')
+            ->with('success', 'Menu updated successfully');
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Menu $menu)
+    public function destroy($id)
     {
-        //
+        $menu = Menu::findOrFail($id);
+        
+        // Delete the image file if it exists
+        if ($menu->gambar && file_exists(public_path('gambar/' . $menu->gambar))) {
+            unlink(public_path('gambar/' . $menu->gambar));
+        }
+        
+        $menu->delete();
+        
+        return redirect()->route('admin.menu-management.index')
+            ->with('success', 'Menu deleted successfully');
     }
 }

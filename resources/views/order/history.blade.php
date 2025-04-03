@@ -414,7 +414,7 @@
                 <p class="text-gray-200 mt-6">Review your past orders and track current ones</p>
             </div>
 
-            @if($orders->isEmpty())
+            @if(empty($groupedOrders))
                 <!-- Empty State -->
                 <div class="empty-state text-center py-16 px-8 animate__animated animate__fadeIn mt-8">
                     <div class="bg-gradient-to-br from-blue-50 to-blue-100 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner">
@@ -429,11 +429,11 @@
             @else
                 <!-- Order List -->
                 <div class="space-y-8">
-                    @foreach($orders as $orderId => $orderDetails)
+                    @foreach($groupedOrders as $orderId => $orderDetails)
                         <div class="order-card animate__animated animate__fadeInUp
                             @if($orderDetails->first()->status == 'Pending') status-pending
-                            @elseif($orderDetails->first()->status == 'Processing') status-processing
-                            @elseif($orderDetails->first()->status == 'Completed') status-completed
+                            @elseif($orderDetails->first()->status == 'Processing' || $orderDetails->first()->status == 'In Transit') status-processing
+                            @elseif($orderDetails->first()->status == 'Completed' || $orderDetails->first()->status == 'Delivered') status-completed
                             @else status-cancelled @endif">
 
                             <!-- Order Header -->
@@ -446,9 +446,13 @@
                                     <div class="flex flex-col sm:items-end">
                                         <span class="text-sm text-gray-500 block mb-1">Order Date</span>
                                         <span class="text-sm font-medium order-date">
-                                            {{ $orderDetails->first()->created_at->format('d M Y, H:i') }}
+                                            {{ $orderDetails->first()->created_at ? $orderDetails->first()->created_at->format('d M Y, H:i') : 'N/A' }}
                                         </span>
                                     </div>
+                                </div>
+                                <div class="mt-4">
+                                    <span class="text-sm text-gray-500 block mb-1">Delivery Address</span>
+                                    <p class="text-gray-700">{{ $orderDetails->first()->alamat }}</p>
                                 </div>
                             </div>
 
@@ -474,21 +478,18 @@
                                             @foreach($orderDetails as $item)
                                                 <tr>
                                                     <td>
-                                                        <span class="menu-item-id">#{{ $item->menu->idmenu }}</span>
+                                                        <span class="menu-item-id">#{{ $item->idmenu }}</span>
                                                     </td>
                                                     <td>
                                                         <div>
-                                                            <p class="menu-item-name">{{ $item->menu->menu }}</p>
+                                                            <p class="menu-item-name">{{ $item->menu->menu ?? 'Unknown Menu' }}</p>
                                                             @if(isset($item->menu->deskripsi))
                                                                 <p class="menu-item-description">{{ $item->menu->deskripsi }}</p>
                                                             @endif
-                                                            {{-- @if(isset($item->menu->kategori))
-                                                                <span class="menu-item-category">{{ $item->menu->kategori }}</span>
-                                                            @endif --}}
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <span class="unit-price">Rp {{ number_format($item->menu->harga, 0, ',', '.') }}</span>
+                                                        <span class="unit-price">Rp {{ number_format($item->menu->harga ?? 0, 0, ',', '.') }}</span>
                                                     </td>
                                                     <td>
                                                         <span class="quantity-badge">
@@ -497,7 +498,7 @@
                                                     </td>
                                                     <td class="text-right">
                                                         <span class="price-highlight">
-                                                            Rp {{ number_format($item->menu->harga * $item->quantity, 0, ',', '.') }}
+                                                            Rp {{ number_format(($item->menu->harga ?? 0) * $item->quantity, 0, ',', '.') }}
                                                         </span>
                                                     </td>
                                                 </tr>
@@ -520,14 +521,6 @@
                                         <span class="text-gray-600">Delivery Fee:</span>
                                         <span class="calculation-result">Rp 10.000</span>
                                     </div>
-                                    @if(isset($orderDetails->first()->tax) && $orderDetails->first()->tax > 0)
-                                    <div class="calculation-row">
-                                        <span class="text-gray-600">Tax (10%):</span>
-                                        <span class="calculation-result">
-                                            Rp {{ number_format($orderDetails->sum('total') * 0.1, 0, ',', '.') }}
-                                        </span>
-                                    </div>
-                                    @endif
                                 </div>
                                 <div class="border-t border-dashed border-gray-200 pt-4 mt-3">
                                     <div class="flex justify-between items-center">
@@ -545,8 +538,8 @@
                                     <div class="mb-4 sm:mb-0">
                                         <span class="status-badge
                                             @if($orderDetails->first()->status == 'Pending') status-pending
-                                            @elseif($orderDetails->first()->status == 'Processing') status-processing
-                                            @elseif($orderDetails->first()->status == 'Completed') status-completed
+                                            @elseif($orderDetails->first()->status == 'Processing' || $orderDetails->first()->status == 'In Transit') status-processing
+                                            @elseif($orderDetails->first()->status == 'Completed' || $orderDetails->first()->status == 'Delivered') status-completed
                                             @else status-cancelled @endif">
                                             <i class="fas fa-circle text-xs mr-2"></i>{{ $orderDetails->first()->status }}
                                         </span>
@@ -558,7 +551,6 @@
                                         @if($orderDetails->first()->status == 'Pending')
                                         <form action="{{ route('order.cancel', $orderId) }}" method="POST" onsubmit="return confirm('Are you sure you want to cancel this order?');">
                                             @csrf
-                                            @method('POST')
                                             <button type="submit" class="action-button bg-gradient-to-r from-red-50 to-red-100 text-red-600 hover:from-red-100 hover:to-red-200 shadow">
                                                 <i class="fas fa-times mr-2"></i>Cancel Order
                                             </button>
@@ -592,7 +584,7 @@
     $(document).ready(function() {
         // Auto-hide flash messages after 5 seconds
         setTimeout(function() {
-            $('[role="alert"]').fadeOut('slow');
+            $('.flash-message').fadeOut('slow');
         }, 5000);
 
         // Add hover effect to table rows
